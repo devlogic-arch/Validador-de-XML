@@ -1,0 +1,2052 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analisador Fiscal NF-e</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+
+  <style>
+  /* ============================================================
+     VARIÁVEIS
+  ============================================================ */
+  :root {
+    --bg:         rgb(8, 11, 16);
+    --surface:    #0f1420;
+    --surface2:   #161d2e;
+    --border:     #25304a;
+    --border2:    #2e3d5c;
+
+    --cyan:       rgb(0, 200, 212);
+    --cyan-dim:   #003d42;
+    --amber:      #f0a500;
+    --amber-dim:  #3d2900;
+    --green:      #22d07a;
+    --green-dim:  #0a2e1c;
+    --red:        #f05050;
+    --red-dim:    #2e0a0a;
+    --blue:       #5b8dee;
+    --blue-dim:   #0d1e42;
+    --purple:     #a78bfa;
+
+    --text:       #b8c8e0;
+    --text-muted: #4a5a78;
+    --text-dim:   #6a7a98;
+
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --r: 5px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; font-size: 16px; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-size: 1rem;  /* herda os 16px do html */
+  }
+
+  /* ============================================================
+     HEADER
+  ============================================================ */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 13px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    width: 30px; height: 30px;
+    background: var(--cyan);
+    border-radius: var(--r);
+    display: grid; place-items: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: #000;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+
+  #headerPill {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 3px 12px;
+    border-radius: 20px;
+  }
+
+  /* ============================================================
+     MAIN
+  ============================================================ */
+  main {
+    flex: 1;
+    padding: 26px;
+    max-width: 1280px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  /* ============================================================
+     UPLOAD
+  ============================================================ */
+  .upload-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .upload-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: border-color 0.2s;
+  }
+
+  .upload-card.ready { border-color: var(--green); }
+  .upload-card.error { border-color: var(--red); }
+
+  .uc-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .uc-title { font-size: 15px; font-weight: 600; color: var(--text); }
+
+  .uc-status {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    word-break: break-all;
+  }
+
+  .uc-status.ok  { color: var(--green); }
+  .uc-status.err { color: var(--red); }
+
+  .uc-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  input[type="file"] { display: none; }
+
+  /* ============================================================
+     BOTÕES
+  ============================================================ */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    cursor: pointer;
+    background: var(--surface2);
+    color: var(--text);
+    transition: all 0.13s;
+    text-transform: uppercase;
+    user-select: none;
+  }
+
+  .btn:hover:not(:disabled)  { border-color: var(--cyan); color: var(--cyan); }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+
+  .btn-clear {
+    border-color: transparent; color: var(--red);
+    background: transparent; padding-left: 0;
+  }
+  .btn-clear:hover:not(:disabled) {
+    border-color: var(--red-dim); background: var(--red-dim); color: var(--red);
+  }
+
+  .btn-run {
+    background: var(--cyan); border-color: var(--cyan);
+    color: #000; font-weight: 600; font-size: 12px; padding: 11px 36px;
+  }
+  .btn-run:hover:not(:disabled) { background: #00e5f0; border-color: #00e5f0; color: #000; }
+  .btn-run:disabled {
+    background: var(--cyan-dim); border-color: var(--cyan-dim);
+    color: #002a2d; cursor: not-allowed;
+  }
+
+  .btn-detail { font-size: 10px; padding: 5px 12px; color: var(--text-dim); }
+  .btn-detail:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
+
+  .action-bar { display: flex; justify-content: center; }
+
+  /* ============================================================
+     RESUMO
+  ============================================================ */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .summary-card.total  { border-top: 2px solid var(--cyan); }
+  .summary-card.errors { border-top: 2px solid var(--red); }
+  .summary-card.ok     { border-top: 2px solid var(--green); }
+
+  .sc-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .sc-value {
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .summary-card.total  .sc-value { color: var(--cyan); }
+  .summary-card.errors .sc-value { color: var(--red); }
+  .summary-card.ok     .sc-value { color: var(--green); }
+
+  /* ============================================================
+     SEÇÃO GENÉRICA
+  ============================================================ */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+
+  .section-hd {
+    padding: 10px 18px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-hd h2 {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  .badge-cyan  { background: var(--cyan-dim);  color: var(--cyan); }
+  .badge-red   { background: var(--red-dim);   color: var(--red); }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+
+  /* ============================================================
+     TABELA PRINCIPAL DE NOTAS
+  ============================================================ */
+  .notes-table { width: 100%; border-collapse: collapse; }
+
+  .notes-table thead tr {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .notes-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    font-weight: 400;
+    padding: 10px 14px;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .notes-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    vertical-align: middle;
+  }
+
+  .notes-table tr:last-child td { border-bottom: none; }
+  .notes-table tbody tr:hover td { background: rgba(255,255,255,0.012); }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.08em;
+  }
+
+  .status-pill.ok  { background: var(--green-dim); color: var(--green); }
+  .status-pill.err { background: var(--red-dim);   color: var(--red); }
+
+  /* ============================================================
+     PAINEL DE DETALHE (expansível)
+  ============================================================ */
+  .detail-row td {
+    padding: 0 !important;
+    background: var(--bg) !important;
+  }
+
+  .detail-wrap {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .detail-wrap.open { display: flex; }
+
+  /* sub-seção dentro do detalhe */
+  .sub-hd {
+    font-family: var(--mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sub-hd::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* grid de campos */
+  .dfields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 9px;
+  }
+
+  .dfield {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .dfield.hl-cyan   { border-color: var(--cyan);   background: linear-gradient(135deg, var(--surface), var(--cyan-dim)); }
+  .dfield.hl-red    { border-color: var(--red);    background: linear-gradient(135deg, var(--surface), var(--red-dim)); }
+  .dfield.hl-amber  { border-color: var(--amber);  background: linear-gradient(135deg, var(--surface), var(--amber-dim)); }
+  .dfield.hl-purple { border-color: var(--purple); background: linear-gradient(135deg, var(--surface), #2a1f4a); }
+
+  .df-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+  }
+
+  .df-value {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .dfield.hl-cyan   .df-value { color: var(--cyan); }
+  .dfield.hl-red    .df-value { color: var(--red); }
+  .dfield.hl-amber  .df-value { color: var(--amber); }
+  .dfield.hl-purple .df-value { color: var(--purple); }
+
+  /* erros */
+  .err-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .err-item {
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    border-radius: var(--r);
+    padding: 10px 15px;
+    font-family: var(--mono);
+    font-size: 12px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 14px;
+    align-items: start;
+    color: #ffaaaa;
+  }
+
+  .err-item.warn {
+    background: var(--amber-dim);
+    border-color: var(--amber);
+    color: #ffd580;
+  }
+
+  .err-tag {
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--red);
+    border: 1px solid var(--red);
+    padding: 2px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  .err-item.warn .err-tag { color: var(--amber); border-color: var(--amber); }
+
+  /* ── Tabela interna de itens ──────────────────────────────
+     table-layout: fixed  → browser respeita as larguras dos th
+     sem <col>            → th:nth-child() é mais confiável e
+                            tem prioridade sobre <col> na cascata
+  ─────────────────────────────────────────────────────── */
+  .inner-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 12px;
+    table-layout: fixed;
+  }
+
+  /*
+   * Larguras por posição — mesma ordem de th e td:
+   *  1:#   2:Descrição  3:NCM     4:CFOP    5:CST ICMS
+   *  6:CST PIS/COFINS   7:CST IBS/CBS       8:VL. PRODUTO   9:cClassTrib
+   */
+  .inner-table th:nth-child(1) { width: 46px;  }
+  .inner-table th:nth-child(2) { width: 320px; }   /* Descrição — ampla, sem truncar */
+  .inner-table th:nth-child(3) { width: 110px; }   /* NCM */
+  .inner-table th:nth-child(4) { width: 70px;  }   /* CFOP */
+  .inner-table th:nth-child(5) { width: 90px;  }   /* CST ICMS */
+  .inner-table th:nth-child(6) { width: 140px; }   /* CST PIS/COFINS */
+  .inner-table th:nth-child(7) { width: 120px; }   /* CST IBS/CBS */
+  .inner-table th:nth-child(8) { width: 130px; text-align: right; } /* VL. PRODUTO */
+  /* cClassTrib: padding-left extra cria separação visual em relação ao VL. PRODUTO */
+  .inner-table th:nth-child(9) { width: 120px; padding-left: 20px; }
+  .inner-table td:nth-child(9) { padding-left: 20px; border-left: 1px solid var(--border); }
+
+  .inner-table th {
+    background: var(--surface2);
+    padding: 10px 14px;
+    text-align: left;
+    color: var(--text-muted);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .inner-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Coluna 2 (Descrição): não trunca — mostra o texto completo */
+  .inner-table td:nth-child(2) {
+    white-space: normal;       /* permite quebra se necessário */
+    word-break: break-word;
+    overflow: visible;
+    text-overflow: unset;
+    color: var(--text);
+    font-weight: 500;          /* leve destaque em relação às colunas de código */
+  }
+
+  /* Coluna 8 (VL. PRODUTO): td alinhado à direita, igual ao th */
+  .inner-table td:nth-child(8) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .inner-table tr:last-child td { border-bottom: none; }
+  .inner-table tbody tr:hover td { background: rgba(255,255,255,0.025); }
+
+  .inner-table .ok-cell  { color: var(--green); font-weight: 600; }
+  .inner-table .err-cell { color: var(--red);   font-weight: 600; }
+
+  /* cards de totais */
+  .totals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 8px;
+  }
+
+  .total-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 11px 13px;
+  }
+
+  .tc-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .tc-value {
+    font-family: var(--mono);
+    font-size: 17px;
+    color: var(--amber);
+    font-weight: 600;
+  }
+
+  /* ============================================================
+     MISC
+  ============================================================ */
+  .empty {
+    text-align: center;
+    padding: 36px 20px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .spinner {
+    width: 13px; height: 13px;
+    border: 2px solid rgba(0,200,212,0.15);
+    border-top-color: var(--cyan);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+  }
+
+  @media (max-width: 720px) {
+    main { padding: 16px; }
+    .upload-grid { grid-template-columns: 1fr; }
+    .summary-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* ============================================================
+     NOVOS ESTILOS — Filtro, Botão Topo e Exportar
+     NÃO alteram nada do CSS existente acima.
+  ============================================================ */
+
+  /* Cards de resumo clicáveis */
+  .summary-card {
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .summary-card.filtro-ativo {
+    box-shadow: 0 0 0 2px var(--cyan);
+  }
+  .summary-card.total.filtro-ativo  { box-shadow: 0 0 0 2px var(--cyan); }
+  .summary-card.errors.filtro-ativo { box-shadow: 0 0 0 2px var(--red); }
+  .summary-card.ok.filtro-ativo     { box-shadow: 0 0 0 2px var(--green); }
+
+  /* Label de filtro ativo embaixo do título da seção */
+  #filtroLabel {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 10px;
+    border-radius: 20px;
+    background: var(--amber-dim);
+    color: var(--amber);
+    display: none;
+  }
+  #filtroLabel.visivel { display: inline-block; }
+
+  /* Botão flutuante "Voltar ao topo" */
+  #btnTopo {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 40px;
+    height: 40px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-dim);
+    transition: all 0.15s;
+    z-index: 200;
+  }
+  #btnTopo.visivel { display: flex; }
+  #btnTopo:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  /* Botão exportar CSV */
+  #btnExportar {
+    display: none;
+    margin-left: auto;
+  }
+  #btnExportar.visivel { display: inline-flex; }
+  </style>
+  <!-- SheetJS — geração de .xlsx sem dependências de bundler -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+
+<body>
+
+<!-- ════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════ -->
+<header>
+  <div class="logo">NF</div>
+  <h1>Analisador Fiscal — NF-e</h1>
+  <span id="headerPill">Aguardando arquivos</span>
+</header>
+
+<!-- ════════════════════════════════════════════════════
+     MAIN
+════════════════════════════════════════════════════ -->
+<main>
+
+  <!-- UPLOAD -->
+  <div class="upload-grid">
+
+    <div class="upload-card" id="cardXml">
+      <div class="uc-eyebrow">Arquivo 01 — Notas Fiscais</div>
+      <div class="uc-title">XMLs de NF-e (múltiplos)</div>
+      <div class="uc-row">
+        <label class="btn" for="inputXml">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Selecionar XMLs
+        </label>
+        <button class="btn btn-clear" id="btnLimparXml" style="display:none">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          Limpar
+        </button>
+      </div>
+      <input type="file" id="inputXml" accept=".xml" multiple />
+      <div class="uc-status" id="statusXml">Nenhum arquivo selecionado</div>
+    </div>
+
+    <div class="upload-card" id="cardParam">
+      <div class="uc-eyebrow">Arquivo 02 — Parametrização</div>
+      <div class="uc-title">JSON ou CSV de Regras</div>
+      <div class="uc-row">
+        <label class="btn" for="inputParam">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Selecionar
+        </label>
+        <button class="btn btn-clear" id="btnLimparParam" style="display:none">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          Limpar
+        </button>
+      </div>
+      <input type="file" id="inputParam" accept=".json,.csv" />
+      <div class="uc-status" id="statusParam">Nenhum arquivo selecionado</div>
+    </div>
+
+  </div>
+
+  <!-- BOTÃO PROCESSAR -->
+  <div class="action-bar">
+    <button class="btn btn-run" id="btnProcessar" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      Processar NF-e
+    </button>
+  </div>
+
+  <!-- RESULTADOS -->
+  <div id="areaResultados" style="display:none; flex-direction:column; gap:20px;">
+
+    <!-- cards de resumo -->
+    <div class="summary-grid">
+      <div class="summary-card total">
+        <div class="sc-label">Total de Notas</div>
+        <div class="sc-value" id="rTotal">0</div>
+      </div>
+      <div class="summary-card errors">
+        <div class="sc-label">Com Divergências</div>
+        <div class="sc-value" id="rErros">0</div>
+      </div>
+      <div class="summary-card ok">
+        <div class="sc-label">Sem Divergências</div>
+        <div class="sc-value" id="rOk">0</div>
+      </div>
+    </div>
+
+    <!-- tabela de notas -->
+    <div class="section">
+      <div class="section-hd">
+        <h2>Notas Processadas</h2>
+        <span class="badge badge-cyan" id="badgeNotas">0 notas</span>
+        <span id="filtroLabel">Filtro ativo</span>
+        <button class="btn btn-detail" id="btnExportar" title="Exportar divergências para CSV">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Exportar divergências
+        </button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="notes-table" id="tabelaNotas">
+          <thead>
+            <tr>
+              <th>Arquivo</th>
+              <th>Nº Nota</th>
+              <th>Série</th>
+              <th>Emitente</th>
+              <th>Itens</th>
+              <th>Total NF</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="corpoNotas"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+  <button id="btnExportar" title="Exportar relatório">
+    Exportar relatório
+  </button>
+  <button id="btnTopo" title="Voltar ao topo">
+     ↑
+  </button>
+
+</main>
+
+<!-- ════════════════════════════════════════════════════
+     JAVASCRIPT
+     ──────────────────────────────────────────────────
+     A. Utilitários
+     B. Estado e Leitura de Arquivos
+     C. Parser de XML (extração de dados)
+     D. Parametrização (JSON/CSV)
+     E. Validação
+     F. Cálculo (PIS/COFINS e IBS/CBS)
+     G. Interface (renderização)
+     H. Controlador Principal
+════════════════════════════════════════════════════ -->
+<script>
+"use strict";
+
+/* ══════════════════════════════════════════════════════
+   A. UTILITÁRIOS
+══════════════════════════════════════════════════════ */
+
+/**
+ * Normaliza um CST preenchendo zeros à esquerda.
+ *
+ * @param {*}      val     – valor bruto (string, number, null…)
+ * @param {number} digits  – quantidade de dígitos desejada
+ * @returns {string}
+ *
+ * Exemplos:
+ *   normCST("1",   3) → "001"
+ *   normCST("200", 3) → "200"
+ *   normCST("6",   2) → "06"
+ *   normCST(null,  2) → ""
+ */
+function normCST(val, digits) {
+  if (val === null || val === undefined || String(val).trim() === "") return "";
+  return String(val).trim().padStart(digits, "0");
+}
+
+/**
+ * Normaliza NCM para 8 dígitos com zeros à esquerda.
+ * Ex: "7019000" → "07019000"
+ */
+function normNCM(val) {
+  if (!val || String(val).trim() === "") return "";
+  return String(val).trim().padStart(8, "0");
+}
+
+/** Formata número como BRL. */
+function fmt(v) {
+  if (v === null || v === undefined || isNaN(v)) return "—";
+  return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/** Formata alíquota decimal como porcentagem. Ex: 0.0065 → "0.65%" */
+function fmtPct(v) {
+  if (v === null || v === undefined) return "—";
+  const n = Number(v);
+  return (n * 100).toFixed(4).replace(/\.?0+$/, "") + "%";
+}
+
+/**
+ * Normaliza o campo cClassTrib para sempre ter 6 dígitos com zeros à esquerda.
+ * Segue o mesmo padrão de normCST() e normNCM().
+ *
+ * @param {*} val – valor bruto (string, number, null…)
+ * @returns {string}
+ *
+ * Exemplos:
+ *   normCClassTrib("1")      → "000001"
+ *   normCClassTrib("200014") → "200014"   (já correto)
+ *   normCClassTrib(1)        → "000001"   (number)
+ *   normCClassTrib(null)     → ""         (ausente)
+ *   normCClassTrib("")       → ""         (vazio)
+ */
+function normCClassTrib(val) {
+  if (val === null || val === undefined || String(val).trim() === "") return "";
+  return String(val).trim().padStart(6, "0");
+}
+
+/**
+ * Extrai o texto de uma tag XML dentro de um elemento.
+ * Retorna "" se a tag não existir — nunca lança erro.
+ */
+function gt(el, tag) {
+  if (!el) return "";
+  const found = el.getElementsByTagName(tag);
+  return found.length ? found[0].textContent.trim() : "";
+}
+
+/**
+ * Extrai número de uma tag XML. Retorna 0 se ausente/inválido.
+ */
+function gn(el, tag) {
+  const v = parseFloat(gt(el, tag));
+  return isNaN(v) ? 0 : v;
+}
+
+/* ══════════════════════════════════════════════════════
+   B. ESTADO E LEITURA DE ARQUIVOS
+══════════════════════════════════════════════════════ */
+
+/** Estado global da aplicação. */
+const Estado = {
+  arquivosXml:    [],   // [{ nome, texto }]
+  parametrizacao: null, // array de regras
+};
+
+/** Lê um File e devolve seu conteúdo como string (Promise). */
+function lerArquivo(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload  = e => resolve(e.target.result);
+    r.onerror = () => reject(new Error("Falha ao ler: " + file.name));
+    r.readAsText(file, "UTF-8");
+  });
+}
+
+/** Atualiza o visual de um card de upload. */
+function setCard(cardId, statusId, texto, estado) {
+  // estado: "ok" | "err" | "neutral"
+  const card   = document.getElementById(cardId);
+  const status = document.getElementById(statusId);
+  status.textContent = texto;
+  status.className   = "uc-status" + (estado !== "neutral" ? " " + estado : "");
+  card.className     = "upload-card" +
+    (estado === "ok" ? " ready" : estado === "err" ? " error" : "");
+}
+
+/** Habilita o botão Processar somente quando ambos os arquivos estão prontos. */
+function checarProntidao() {
+  const ok = Estado.arquivosXml.length > 0 && Estado.parametrizacao !== null;
+  document.getElementById("btnProcessar").disabled = !ok;
+  document.getElementById("headerPill").textContent = ok
+    ? `${Estado.arquivosXml.length} XML(s) + parametrização prontos`
+    : "Aguardando arquivos";
+}
+
+/* ── Listeners de upload ── */
+
+document.getElementById("inputXml").addEventListener("change", async function () {
+  const files = Array.from(this.files);
+  if (!files.length) return;
+  try {
+    Estado.arquivosXml = await Promise.all(
+      files.map(async f => ({ nome: f.name, texto: await lerArquivo(f) }))
+    );
+    setCard("cardXml", "statusXml",
+      `✓ ${Estado.arquivosXml.length} arquivo(s) carregado(s)`, "ok");
+    document.getElementById("btnLimparXml").style.display = "inline-flex";
+  } catch (e) {
+    Estado.arquivosXml = [];
+    setCard("cardXml", "statusXml", "✗ " + e.message, "err");
+  }
+  checarProntidao();
+});
+
+document.getElementById("inputParam").addEventListener("change", async function () {
+  const file = this.files[0];
+  if (!file) return;
+  try {
+    const texto = await lerArquivo(file);
+    const ext   = file.name.split(".").pop().toLowerCase();
+    Estado.parametrizacao = ext === "csv" ? parseCSV(texto) : JSON.parse(texto);
+    setCard("cardParam", "statusParam",
+      `✓ ${file.name} (${Estado.parametrizacao.length} regras)`, "ok");
+    document.getElementById("btnLimparParam").style.display = "inline-flex";
+  } catch (e) {
+    Estado.parametrizacao = null;
+    setCard("cardParam", "statusParam", "✗ " + e.message, "err");
+  }
+  checarProntidao();
+});
+
+document.getElementById("btnLimparXml").addEventListener("click", function () {
+  Estado.arquivosXml = [];
+  document.getElementById("inputXml").value = "";
+  setCard("cardXml", "statusXml", "Nenhum arquivo selecionado", "neutral");
+  this.style.display = "none";
+  document.getElementById("areaResultados").style.display = "none";
+  checarProntidao();
+});
+
+document.getElementById("btnLimparParam").addEventListener("click", function () {
+  Estado.parametrizacao = null;
+  document.getElementById("inputParam").value = "";
+  setCard("cardParam", "statusParam", "Nenhum arquivo selecionado", "neutral");
+  this.style.display = "none";
+  checarProntidao();
+});
+
+/* ══════════════════════════════════════════════════════
+   C. PARSER DE XML
+   Extrai todos os dados de uma NF-e.
+   Retorna { cabecalho, itens }.
+══════════════════════════════════════════════════════ */
+
+/**
+ * Processa o texto XML de uma NF-e e devolve estrutura normalizada.
+ *
+ * Campos extraídos do cabeçalho (tag ICMSTot e ide/emit/dest):
+ *   numero, serie, dataEmissao, natureza,
+ *   cnpjEmitente, nomeEmitente, cnpjDestinatario, nomeDestinatario,
+ *   vNF, vICMS, vIPI, vPIS (XML), vCOFINS (XML), vST,
+ *   vDIFAL, vFrete
+ *
+ * Cada item (tag det) carrega:
+ *   numero, codigo, descricao, ncm (8 dígitos), cfop, cClassTrib,
+ *   valorProduto, cstICMS, vICMS, vICMSST, vIPI,
+ *   cstPIS, vPIS, cstCOFINS, vCOFINS, cstPisCofins, cstIbsCbs
+ */
+function parseNFe(xmlTexto, nomeArquivo) {
+  const parser = new DOMParser();
+  const doc    = parser.parseFromString(xmlTexto, "application/xml");
+
+  if (doc.getElementsByTagName("parsererror").length > 0) {
+    throw new Error(`XML inválido: ${nomeArquivo}`);
+  }
+
+  const ide  = doc.getElementsByTagName("ide")[0];
+  const emit = doc.getElementsByTagName("emit")[0];
+  const dest = doc.getElementsByTagName("dest")[0];
+  const tot  = doc.getElementsByTagName("ICMSTot")[0];
+
+  // ── DIFAL (ICMSUFDest) ──────────────────────────────────
+  // Presente em operações interestaduais para consumidor final.
+  // Se a tag não existir, DIFAL = 0.
+  const ufDestEl = doc.getElementsByTagName("ICMSUFDest")[0];
+  const vDIFAL   = ufDestEl ? gn(ufDestEl, "vICMSUFDest") : 0;
+
+  // ── FRETE ───────────────────────────────────────────────
+  // Pode vir tanto no totalizador quanto no produto.
+  // Preferência: totalizador ICMSTot > vFrete do prod.
+  const vFrete = gn(tot, "vFrete");
+
+  const cabecalho = {
+    arquivo:           nomeArquivo,
+    numero:            gt(ide,  "nNF"),
+    serie:             gt(ide,  "serie"),
+    dataEmissao:       gt(ide,  "dhEmi"),
+    natureza:          gt(ide,  "natOp"),
+    cnpjEmitente:      gt(emit, "CNPJ"),
+    nomeEmitente:      gt(emit, "xNome"),
+    cnpjDestinatario:  gt(dest, "CNPJ") || gt(dest, "CPF"),
+    nomeDestinatario:  gt(dest, "xNome"),
+    // Totais declarados no XML (usados como referência para validação)
+    vNF:      gn(tot, "vNF"),
+    vICMS:    gn(tot, "vICMS"),
+    vIPI:     gn(tot, "vIPI"),
+    vST:      gn(tot, "vST"),
+    vPIS_xml: gn(tot, "vPIS"),
+    vCOFINS_xml: gn(tot, "vCOFINS"),
+    vDIFAL,
+    vFrete,
+  };
+
+  // ── Itens ────────────────────────────────────────────────
+  const detEls = doc.getElementsByTagName("det");
+  const itens  = [];
+
+  for (let i = 0; i < detEls.length; i++) {
+    const det     = detEls[i];
+    const prod    = det.getElementsByTagName("prod")[0];
+    const imposto = det.getElementsByTagName("imposto")[0];
+
+    const item = {
+      numero:       det.getAttribute("nItem") || (i + 1),
+      codigo:       gt(prod, "cProd"),
+      descricao:    gt(prod, "xProd"),
+      // NCM normalizado para 8 dígitos
+      ncm:          normNCM(gt(prod, "NCM")),
+      cfop:         gt(prod, "CFOP"),
+      valorProduto: gn(prod, "vProd"),
+      // cClassTrib é extraído abaixo, após localizar <IBSCBS>
+    };
+
+    // ICMS — o grupo varia: ICMS00, ICMS10, ICMS20, ICMS40, ICMS60, etc.
+    item.cstICMS = "";
+    item.vICMS   = 0;
+    item.vICMSST = 0;
+
+    const icmsEl = imposto ? imposto.getElementsByTagName("ICMS")[0] : null;
+    if (icmsEl) {
+      for (const child of icmsEl.childNodes) {
+        if (child.nodeType !== 1) continue; // ignora text nodes
+        item.cstICMS = gt(child, "CST") || gt(child, "CSOSN");
+        item.vICMS   = gn(child, "vICMS");
+        item.vICMSST = gn(child, "vICMSST");
+        break;
+      }
+    }
+
+    // IPI
+    const ipiTrib = imposto ? imposto.getElementsByTagName("IPITrib")[0] : null;
+    item.vIPI = ipiTrib ? gn(ipiTrib, "vIPI") : 0;
+
+    // PIS (PISAliq = tributado / PISNT = não tributado)
+    const pisAliq = imposto ? imposto.getElementsByTagName("PISAliq")[0]  : null;
+    const pisNT   = imposto ? imposto.getElementsByTagName("PISNT")[0]    : null;
+    const pisEl   = pisAliq || pisNT;
+    item.cstPIS = pisEl ? gt(pisEl, "CST") : "";
+    item.vPIS   = pisAliq ? gn(pisAliq, "vPIS") : 0;
+
+    // Fallback PIS: <PISOutr> — usado quando PISAliq/PISNT não existem ou não preencheram valores
+    if (!item.cstPIS && !item.vPIS) {
+      const pisOutr = imposto ? imposto.getElementsByTagName("PISOutr")[0] : null;
+      if (pisOutr) {
+        item.cstPIS = gt(pisOutr, "CST");
+        item.vPIS   = gn(pisOutr, "vPIS");
+      }
+    }
+
+    // COFINS
+    const cofAliq = imposto ? imposto.getElementsByTagName("COFINSAliq")[0] : null;
+    const cofNT   = imposto ? imposto.getElementsByTagName("COFINSNT")[0]   : null;
+    const cofEl   = cofAliq || cofNT;
+    item.cstCOFINS = cofEl ? gt(cofEl, "CST") : "";
+    item.vCOFINS   = cofAliq ? gn(cofAliq, "vCOFINS") : 0;
+
+    // Fallback COFINS: <COFINSOutr> — usado quando COFINSAliq/COFINSNT não existem ou não preencheram valores
+    if (!item.cstCOFINS && !item.vCOFINS) {
+      const cofOutr = imposto ? imposto.getElementsByTagName("COFINSOutr")[0] : null;
+      if (cofOutr) {
+        item.cstCOFINS = gt(cofOutr, "CST");
+        item.vCOFINS   = gn(cofOutr, "vCOFINS");
+      }
+    }
+
+    // CST PIS/COFINS (devem ser iguais; usa PIS como referência)
+    item.cstPisCofins = item.cstPIS || item.cstCOFINS;
+
+    // CST IBS/CBS e cClassTrib — ambos vivem dentro de <IBSCBS>
+    // Estrutura do XML:
+    //   <imposto>
+    //     <IBSCBS>
+    //       <CST>200</CST>
+    //       <cClassTrib>200014</cClassTrib>
+    //     </IBSCBS>
+    //   </imposto>
+    // Se a tag <IBSCBS> não existir, tentamos fallbacks para compatibilidade.
+    const ibscbsEl = imposto ? imposto.getElementsByTagName("IBSCBS")[0] : null;
+
+    item.cstIbsCbs = ibscbsEl
+      ? (gt(ibscbsEl, "CST") || gt(ibscbsEl, "cst"))
+      : gt(prod, "cstIBSCBS");  // fallback: campo auxiliar no prod
+
+    // cClassTrib: extrai de <IBSCBS> → <cClassTrib> (caminho correto).
+    // Fallback 1: tag <cClassTrib> diretamente no <prod> (algumas versões de schema).
+    // Fallback 2: preenchido depois pelo renderizador via parametrização.
+    item.cClassTrib = ibscbsEl
+      ? gt(ibscbsEl, "cClassTrib")
+      : gt(prod, "cClassTrib");
+
+    itens.push(item);
+  }
+
+  return { cabecalho, itens };
+}
+
+/* ══════════════════════════════════════════════════════
+   D. PARAMETRIZAÇÃO (JSON / CSV)
+══════════════════════════════════════════════════════ */
+
+/**
+ * Converte CSV com cabeçalho em array de objetos.
+ * Detecta separador vírgula ou ponto-e-vírgula automaticamente.
+ * Converte "true"/"false" em boolean e strings numéricas em número.
+ */
+function parseCSV(texto) {
+  const linhas = texto.trim().split(/\r?\n/);
+  if (linhas.length < 2) throw new Error("CSV sem dados.");
+
+  const sep   = linhas[0].includes(";") ? ";" : ",";
+  const heads = linhas[0].split(sep).map(h => h.trim().replace(/^"|"$/g, ""));
+
+  return linhas.slice(1).filter(l => l.trim()).map(linha => {
+    const vals = linha.split(sep).map(v => v.trim().replace(/^"|"$/g, ""));
+    const obj  = {};
+    heads.forEach((h, i) => {
+      const v = vals[i] ?? "";
+      if      (v === "true")             obj[h] = true;
+      else if (v === "false")            obj[h] = false;
+      else if (v !== "" && !isNaN(v))   obj[h] = parseFloat(v);
+      else                              obj[h] = v;
+    });
+    return obj;
+  });
+}
+
+/**
+ * Busca a regra de parametrização mais específica.
+ * Prioridade decrescente:
+ *   1. empresa + cfop + ncm  (match exato)
+ *   2. empresa + cfop        (fallback sem NCM)
+ *   3. empresa + ncm         (fallback sem CFOP)
+ *
+ * @param {Array}  param   – array de regras
+ * @param {string} empresa
+ * @param {string} cfop
+ * @param {string} ncm     – já normalizado para 8 dígitos
+ * @returns {Object|null}
+ */
+function buscarRegra(param, empresa, cfop, ncm) {
+  const match = (r, useCfop, useNcm) =>
+    r.empresa === empresa &&
+    (!useCfop || String(r.cfop) === String(cfop)) &&
+    (!useNcm  || normNCM(String(r.ncm)) === normNCM(String(ncm)));
+
+  return (
+    param.find(r => match(r, true,  true))  ||
+    param.find(r => match(r, true,  false)) ||
+    param.find(r => match(r, false, true))  ||
+    null
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   E. VALIDAÇÃO
+   Compara dados normalizados do XML contra parametrização.
+   Retorna array de erros { tipo, msg, destaque? }.
+══════════════════════════════════════════════════════ */
+
+/**
+ * Valida todos os itens de uma NF-e.
+ *
+ * Normalização aplicada antes de cada comparação:
+ *   CST ICMS      → 3 dígitos
+ *   CST PIS/COFINS → 2 dígitos
+ *   CST IBS/CBS   → 3 dígitos (mesmo padrão ICMS)
+ *   NCM           → 8 dígitos
+ */
+function validarNota(itens, param, empresa) {
+  const erros = [];
+
+  itens.forEach(item => {
+    const pre   = `Item ${item.numero} (${item.descricao})`;
+    const regra = buscarRegra(param, empresa, item.cfop, item.ncm);
+
+    if (!regra) {
+      erros.push({
+        tipo: "SEM_REGRA",
+        msg:  `${pre}: sem parametrização para CFOP ${item.cfop} / NCM ${item.ncm}`,
+      });
+      return;
+    }
+
+    // CFOP
+    if (String(regra.cfop) !== String(item.cfop)) {
+      erros.push({
+        tipo: "CFOP_DIVERGENTE",
+        msg:  `${pre}: CFOP esperado ${regra.cfop} | encontrado ${item.cfop}`,
+      });
+    }
+
+    // NCM (normalizado)
+    if (regra.ncm && normNCM(String(regra.ncm)) !== normNCM(String(item.ncm))) {
+      erros.push({
+        tipo: "NCM_DIVERGENTE",
+        msg:  `${pre}: NCM esperado ${normNCM(String(regra.ncm))} | encontrado ${item.ncm}`,
+      });
+    }
+
+    // CST ICMS → 3 dígitos
+    if (regra.cst_icms) {
+      const esp = normCST(regra.cst_icms, 3);
+      const enc = normCST(item.cstICMS,   3);
+      if (esp !== enc) {
+        erros.push({
+          tipo: "CST_ICMS_INCORRETO",
+          msg:  `${pre}: CST ICMS esperado ${esp} | encontrado ${enc}`,
+        });
+      }
+    }
+
+    // CST PIS/COFINS → 2 dígitos
+    if (regra.cst_pis_cofins) {
+      const esp = normCST(regra.cst_pis_cofins, 2);
+      const enc = normCST(item.cstPisCofins,    2);
+      if (esp !== enc) {
+        erros.push({
+          tipo: "CST_PIS_COFINS_INCORRETO",
+          msg:  `${pre}: CST PIS/COFINS esperado ${esp} | encontrado ${enc}`,
+        });
+      }
+    }
+
+    // CST IBS/CBS → 3 dígitos (campo de destaque)
+    if (regra.cst_ibs_cbs) {
+      const esp = normCST(regra.cst_ibs_cbs, 3);
+      const enc = normCST(item.cstIbsCbs,    3);
+      if (esp !== enc) {
+        erros.push({
+          tipo:      "CST_IBS_CBS_INCORRETO",
+          msg:       `${pre}: CST IBS/CBS esperado ${esp} | encontrado ${enc || "não informado"}`,
+          destaque:  true, // marcado para destaque visual
+        });
+      }
+    }
+
+    // cClassTrib → 6 dígitos (mesmo padrão de normCST/normNCM)
+    if (regra.cClassTrib && item.cClassTrib) {
+      const esp = normCClassTrib(regra.cClassTrib);
+      const enc = normCClassTrib(item.cClassTrib);
+      if (esp !== enc) {
+        erros.push({
+          tipo: "CCLASS_TRIB_INCORRETO",
+          msg:  `${pre}: cClassTrib esperado ${esp} | encontrado ${enc}`,
+        });
+      }
+    }
+  });
+
+  return erros;
+}
+
+/* ══════════════════════════════════════════════════════
+   F. CÁLCULO
+   Apura PIS/COFINS e IBS/CBS com base na parametrização.
+   Os cálculos usam os totalizadores da nota (vNF, vICMS…)
+   e NÃO confiam nos valores de imposto declarados no XML.
+══════════════════════════════════════════════════════ */
+
+/**
+ * Calcula a base de PIS/COFINS.
+ *
+ * Nova fórmula (frete NÃO deduzido):
+ *   base = vNF - vICMS - vST - vIPI - vDIFAL
+ *
+ * @param {number} vNF    – valor total da nota
+ * @param {number} vICMS  – ICMS próprio
+ * @param {number} vST    – ICMS Substituição Tributária (0 se ausente)
+ * @param {number} vIPI   – IPI (0 se ausente)
+ * @param {number} vDIFAL – DIFAL (0 se ausente)
+ * @returns {number}
+ */
+function calcularBasePIS(vNF, vICMS, vST, vIPI, vDIFAL) {
+  return Math.max(0, vNF - vICMS - vST - vIPI - vDIFAL);
+}
+
+/**
+ * Calcula a base de IBS/CBS.
+ *
+ * Nova fórmula (frete NÃO deduzido):
+ *   base = vNF - vICMS - vST - vIPI - vPIS - vCOFINS - vDIFAL
+ *
+ * @param {number} vNF     – valor total da nota
+ * @param {number} vICMS   – ICMS próprio
+ * @param {number} vST     – ICMS Substituição Tributária (0 se ausente)
+ * @param {number} vIPI    – IPI (0 se ausente)
+ * @param {number} vPIS    – PIS calculado
+ * @param {number} vCOFINS – COFINS calculado
+ * @param {number} vDIFAL  – DIFAL (0 se ausente)
+ * @returns {number}
+ */
+function calcularBaseIBS(vNF, vICMS, vST, vIPI, vPIS, vCOFINS, vDIFAL) {
+  return Math.max(0, vNF - vICMS - vST - vIPI - vPIS - vCOFINS - vDIFAL);
+}
+
+/**
+ * Realiza os cálculos de PIS/COFINS e IBS/CBS para uma nota inteira.
+ *
+ * Fórmulas:
+ * ──────────────────────────────────────────────────────
+ * Base PIS/COFINS:
+ *   base = vNF - vICMS - vST - vIPI - vDIFAL
+ *   (frete NÃO deduzido)
+ *
+ * PIS    = base × aliquota_pis
+ * COFINS = base × aliquota_cofins
+ *
+ * Validação PIS/COFINS:
+ *   diferença = |calculado - xml| > 0.01 → ALERTA
+ *
+ * Base IBS/CBS:
+ *   base = vNF - vICMS - vST - vIPI - vPIS_calc - vCOFINS_calc - vDIFAL
+ *   se tem_reducao: base = base * (1 - reducao_base)
+ *   (frete NÃO deduzido)
+ *
+ * CBS = base × aliquota_cbs
+ * IBS = base × aliquota_ibs
+ * ──────────────────────────────────────────────────────
+ *
+ * @param {Object} cabecalho   – totalizadores da nota
+ * @param {Array}  itens       – itens (para buscar a regra via primeiro item)
+ * @param {Array}  param       – parametrização
+ * @param {string} empresa
+ * @returns {Object} calculo completo
+ */
+function calcularNota(cabecalho, itens, param, empresa) {
+  // Para obter as alíquotas, usamos a regra do primeiro item encontrado.
+  // Em casos com múltiplos CFOPs/NCMs, esta lógica pode ser expandida
+  // para calcular por item e somar.
+  let regra = null;
+  for (const item of itens) {
+    regra = buscarRegra(param, empresa, item.cfop, item.ncm);
+    if (regra) break;
+  }
+
+  if (!regra) {
+    return {
+      regra: null,
+      semRegra: true,
+      basePisCofins: 0, vPIS_calc: 0, vCOFINS_calc: 0,
+      baseIbsCbs: 0,    vCBS_calc: 0, vIBS_calc: 0,
+      diferencaPIS: null, diferencaCOFINS: null,
+      reducaoAplicada: false, alertas: [],
+    };
+  }
+
+  const { vNF, vICMS, vIPI, vST, vDIFAL,
+          vPIS_xml, vCOFINS_xml } = cabecalho;
+
+  // ── Base PIS/COFINS ── (via função centralizada, sem frete)
+  const basePisCofins = calcularBasePIS(vNF, vICMS, vST, vIPI, vDIFAL);
+
+  const vPIS_calc    = basePisCofins * (regra.aliquota_pis    || 0);
+  const vCOFINS_calc = basePisCofins * (regra.aliquota_cofins || 0);
+
+  // ── Validação PIS/COFINS contra XML (tolerância R$ 0,03) ──
+  const TOLERANCIA     = 0.03;
+  const diferencaPIS   = Math.abs(vPIS_calc   - vPIS_xml);
+  const diferencaCOFINS= Math.abs(vCOFINS_calc - vCOFINS_xml);
+  const alertas        = [];
+
+  if (diferencaPIS > TOLERANCIA) {
+    alertas.push({
+      tipo: "PIS_DIVERGENTE",
+      msg:  `PIS: calculado ${fmt(vPIS_calc)} | XML ${fmt(vPIS_xml)} | diferença ${fmt(diferencaPIS)}`,
+    });
+  }
+
+  if (diferencaCOFINS > TOLERANCIA) {
+    alertas.push({
+      tipo: "COFINS_DIVERGENTE",
+      msg:  `COFINS: calculado ${fmt(vCOFINS_calc)} | XML ${fmt(vCOFINS_xml)} | diferença ${fmt(diferencaCOFINS)}`,
+    });
+  }
+
+  // ── Base IBS/CBS ── (via função centralizada, sem frete)
+  let baseIbsCbs = calcularBaseIBS(vNF, vICMS, vST, vIPI, vPIS_calc, vCOFINS_calc, vDIFAL);
+
+  const reducaoAplicada = regra.tem_reducao === true && (regra.reducao_base || 0) > 0;
+  if (reducaoAplicada) {
+    baseIbsCbs = baseIbsCbs * (1 - regra.reducao_base);
+  }
+
+  const vCBS_calc = baseIbsCbs * (regra.aliquota_cbs || 0);
+  const vIBS_calc = baseIbsCbs * (regra.aliquota_ibs || 0);
+
+  return {
+    regra,
+    semRegra:       false,
+    basePisCofins,
+    vPIS_calc,
+    vCOFINS_calc,
+    diferencaPIS,
+    diferencaCOFINS,
+    baseIbsCbs,
+    vCBS_calc,
+    vIBS_calc,
+    reducaoAplicada,
+    reducaoBase:    regra.reducao_base || 0,
+    temBeneficio:   regra.tem_beneficio === true,
+    aliquotaPis:    regra.aliquota_pis    || 0,
+    aliquotaCof:    regra.aliquota_cofins || 0,
+    aliquotaCbs:    regra.aliquota_cbs    || 0,
+    aliquotaIbs:    regra.aliquota_ibs    || 0,
+    alertas,
+  };
+}
+
+/* ══════════════════════════════════════════════════════
+   G. INTERFACE — RENDERIZAÇÃO
+══════════════════════════════════════════════════════ */
+
+let resultadosGlobais = [];
+
+/**
+ * Alterna o painel de detalhe de uma nota.
+ * Exposta globalmente para ser acessível via onclick no HTML gerado.
+ */
+function toggleDetalhe(idx) {
+  const wrap = document.getElementById(`dw-${idx}`);
+  const btn  = document.querySelector(`#nm-${idx} .btn-detail`);
+  const open = wrap.classList.toggle("open");
+  if (btn) btn.textContent = open ? "Fechar" : "Ver detalhes";
+}
+
+/**
+ * Gera o HTML completo de uma linha + painel de detalhe de uma nota.
+ */
+function renderLinha(resultado, idx) {
+  const { cabecalho, erros, calculo } = resultado;
+  const temErro  = erros.length > 0 || calculo.alertas.length > 0;
+  const totalErros = erros.length + calculo.alertas.length;
+
+  const pill = temErro
+    ? `<span class="status-pill err">✗ ${totalErros} problema${totalErros > 1 ? "s" : ""}</span>`
+    : `<span class="status-pill ok">✓ OK</span>`;
+
+  const linhaMain = `
+    <tr id="nm-${idx}">
+      <td style="color:var(--text-dim);font-size:10px">${cabecalho.arquivo}</td>
+      <td>${cabecalho.numero}</td>
+      <td>${cabecalho.serie}</td>
+      <td>${cabecalho.nomeEmitente || "—"}</td>
+      <td style="text-align:center">${resultado.itens.length}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums">${fmt(cabecalho.vNF)}</td>
+      <td>${pill}</td>
+      <td>
+        <button class="btn btn-detail" onclick="toggleDetalhe(${idx})">
+          Ver detalhes
+        </button>
+      </td>
+    </tr>`;
+
+  const linhaDetalhe = `
+    <tr class="detail-row">
+      <td colspan="8">
+        <div class="detail-wrap" id="dw-${idx}">
+          ${renderDetalhe(resultado)}
+        </div>
+      </td>
+    </tr>`;
+
+  return linhaMain + linhaDetalhe;
+}
+
+/**
+ * Constrói o HTML interno do painel de detalhe de uma nota.
+ * Inclui: dados gerais, componentes de base, erros/alertas,
+ *         tabela de itens por NCM/CFOP, totais calculados.
+ */
+function renderDetalhe(resultado) {
+  const { cabecalho, itens, erros, calculo } = resultado;
+  const parts = [];
+
+  /* ── 1. Dados da Nota ── */
+  parts.push(`<div>
+    <div class="sub-hd">Dados da Nota</div>
+    <div class="dfields">
+      ${df("Nº / Série",      cabecalho.numero + " / " + cabecalho.serie)}
+      ${df("Emissão",         (cabecalho.dataEmissao || "").replace("T"," ").substring(0,16) || "—")}
+      ${df("Emitente CNPJ",  cabecalho.cnpjEmitente || "—")}
+      ${df("Destinatário",   cabecalho.nomeDestinatario || "—")}
+      ${df("Vl. Total NF",   fmt(cabecalho.vNF))}
+      ${df("ICMS (XML)",     fmt(cabecalho.vICMS))}
+      ${df("IPI (XML)",      fmt(cabecalho.vIPI))}
+      ${df("ST (XML)",       fmt(cabecalho.vST))}
+      ${df("DIFAL",          fmt(cabecalho.vDIFAL),    cabecalho.vDIFAL > 0 ? "hl-purple" : "")}
+      ${df("Frete",          fmt(cabecalho.vFrete),    cabecalho.vFrete  > 0 ? "hl-amber"  : "")}
+      ${df("PIS (XML)",      fmt(cabecalho.vPIS_xml))}
+      ${df("COFINS (XML)",   fmt(cabecalho.vCOFINS_xml))}
+    </div>
+  </div>`);
+
+  /* ── 2. Base de Cálculo ── */
+  if (!calculo.semRegra) {
+    parts.push(`<div>
+      <div class="sub-hd">Bases e Alíquotas Aplicadas</div>
+      <div class="dfields">
+        ${df("Base PIS/COFINS",   fmt(calculo.basePisCofins), "hl-cyan")}
+        ${df("Alíq. PIS",         fmtPct(calculo.aliquotaPis))}
+        ${df("Alíq. COFINS",      fmtPct(calculo.aliquotaCof))}
+        ${df("PIS Calculado",     fmt(calculo.vPIS_calc))}
+        ${df("COFINS Calculado",  fmt(calculo.vCOFINS_calc))}
+        ${df("Base IBS/CBS",      fmt(calculo.baseIbsCbs), "hl-cyan")}
+        ${df("Redução Aplicada",  calculo.reducaoAplicada ? (calculo.reducaoBase * 100).toFixed(1) + "%" : "Não", calculo.reducaoAplicada ? "hl-amber" : "")}
+        ${df("Alíq. CBS",         fmtPct(calculo.aliquotaCbs))}
+        ${df("Alíq. IBS",         fmtPct(calculo.aliquotaIbs))}
+        ${df("CBS Calculado",     fmt(calculo.vCBS_calc))}
+        ${df("IBS Calculado",     fmt(calculo.vIBS_calc))}
+        ${df("Benefício",         calculo.temBeneficio ? "Sim ★" : "Não")}
+      </div>
+    </div>`);
+  }
+
+  /* ── 3. Erros de validação e alertas de cálculo ── */
+  const todosProblemas = [
+    ...erros,
+    ...calculo.alertas.map(a => ({ ...a, ehAlerta: true })),
+  ];
+
+  if (todosProblemas.length > 0) {
+    const lista = todosProblemas.map(e => `
+      <div class="err-item${e.ehAlerta ? " warn" : ""}">
+        <span class="err-tag">${e.tipo.replace(/_/g, " ")}</span>
+        <span>${e.msg}</span>
+      </div>`).join("");
+
+    parts.push(`<div>
+      <div class="sub-hd" style="color:var(--red)">Divergências e Alertas</div>
+      <div class="err-list">${lista}</div>
+    </div>`);
+  } else {
+    parts.push(`<div>
+      <div class="sub-hd" style="color:var(--green)">Validação</div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--green);padding:8px 0">
+        ✓ Nenhuma divergência encontrada
+      </div>
+    </div>`);
+  }
+
+  /* ── 4. Tabela de itens (CSTs por produto) ── */
+  const linhasItens = itens.map(item => {
+    const cstIcms   = normCST(item.cstICMS,       3) || "—";
+    const cstPisCof = normCST(item.cstPisCofins,  2) || "—";
+    const cstIbsCbs = normCST(item.cstIbsCbs,     3) || "—";
+
+    // Destaca CST IBS/CBS divergente
+    const regra = calculo.regra;
+    const ibsOk = !regra || !regra.cst_ibs_cbs ||
+                  normCST(regra.cst_ibs_cbs, 3) === cstIbsCbs;
+
+    /*
+     * cClassTrib: tenta primeiro o valor extraído do XML (tag <cClassTrib> dentro
+     * de <IBSCBS>). Se estiver vazio, usa o valor da regra de parametrização como
+     * fallback. Normaliza para 6 dígitos via normCClassTrib() (ex: "1" → "000001").
+     */
+    const cClassTribRaw = item.cClassTrib || (regra ? String(regra.cClassTrib || "") : "");
+    const cClassTrib    = normCClassTrib(cClassTribRaw) || "—";
+
+    return `<tr>
+      <td>${item.numero}</td>
+      <td title="${item.descricao}">${item.descricao}</td>
+      <td>${item.ncm}</td>
+      <td>${item.cfop}</td>
+      <td>${cstIcms}</td>
+      <td>${cstPisCof}</td>
+      <td class="${ibsOk ? "ok-cell" : "err-cell"}">
+        ${cstIbsCbs}${!ibsOk ? " !" : ""}
+      </td>
+      <td>${fmt(item.valorProduto)}</td>
+      <td>${cClassTrib}</td>
+    </tr>`;
+  }).join("");
+
+  parts.push(`<div>
+    <div class="sub-hd">Itens — CSTs e Valores por Produto</div>
+    <div style="overflow-x:auto">
+      <table class="inner-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Descrição</th>
+            <th>NCM</th>
+            <th>CFOP</th>
+            <th>CST ICMS</th>
+            <th>CST PIS/COFINS</th>
+            <th style="color:var(--cyan)">CST IBS/CBS</th>
+            <th>VL. PRODUTO</th>
+            <th>cClassTrib</th>
+          </tr>
+        </thead>
+        <tbody>${linhasItens}</tbody>
+      </table>
+    </div>
+  </div>`);
+
+  /* ── 5. Totais calculados ── */
+  if (!calculo.semRegra) {
+    const cargaTotal = calculo.vPIS_calc + calculo.vCOFINS_calc +
+                       calculo.vCBS_calc + calculo.vIBS_calc;
+
+    parts.push(`<div>
+      <div class="sub-hd">Totais Calculados</div>
+      <div class="totals-grid">
+        ${tc("PIS Calculado",       calculo.vPIS_calc)}
+        ${tc("PIS (XML)",           cabecalho.vPIS_xml)}
+        ${tc("COFINS Calculado",    calculo.vCOFINS_calc)}
+        ${tc("COFINS (XML)",        cabecalho.vCOFINS_xml)}
+        ${tc("CBS Calculado",       calculo.vCBS_calc)}
+        ${tc("IBS Calculado",       calculo.vIBS_calc)}
+        ${tc("IBS + CBS",           calculo.vCBS_calc + calculo.vIBS_calc)}
+        ${tc("Carga Total (PIS+COF+IBS+CBS)", cargaTotal)}
+      </div>
+    </div>`);
+  }
+
+  return parts.join("");
+}
+
+/** Gera um card de campo para o painel de detalhe. */
+function df(label, value, hl = "") {
+  return `<div class="dfield${hl ? " " + hl : ""}">
+    <div class="df-label">${label}</div>
+    <div class="df-value">${value}</div>
+  </div>`;
+}
+
+/** Gera um card de total calculado. */
+function tc(label, valor) {
+  return `<div class="total-card">
+    <div class="tc-label">${label}</div>
+    <div class="tc-value">${fmt(valor)}</div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   H. CONTROLADOR PRINCIPAL
+   Orquestra o processamento completo de todos os XMLs.
+══════════════════════════════════════════════════════ */
+
+document.getElementById("btnProcessar").addEventListener("click", async function () {
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Processando...`;
+
+  // Aguarda um frame para o browser atualizar a UI antes de processar
+  await new Promise(r => setTimeout(r, 60));
+
+  try {
+    resultadosGlobais = [];
+
+    // Empresa: extraída do primeiro registro da parametrização.
+    // Você pode expandir esta lógica para vincular CNPJ ↔ empresa.
+    const empresa = Estado.parametrizacao.length > 0
+      ? Estado.parametrizacao[0].empresa
+      : "";
+
+    for (const { nome, texto } of Estado.arquivosXml) {
+      // 1. Extrai dados do XML
+      const { cabecalho, itens } = parseNFe(texto, nome);
+
+      // 2. Valida CSTs e campos contra parametrização
+      const erros = validarNota(itens, Estado.parametrizacao, empresa);
+
+      // 3. Calcula impostos e valida contra XML
+      const calculo = calcularNota(cabecalho, itens, Estado.parametrizacao, empresa);
+
+      resultadosGlobais.push({ cabecalho, itens, erros, calculo });
+    }
+
+    // ── Atualiza cards de resumo ──
+    const total   = resultadosGlobais.length;
+    const comErro = resultadosGlobais.filter(
+      r => r.erros.length > 0 || r.calculo.alertas.length > 0
+    ).length;
+    const semErro = total - comErro;
+
+    document.getElementById("rTotal").textContent = total;
+    document.getElementById("rErros").textContent = comErro;
+    document.getElementById("rOk").textContent    = semErro;
+    document.getElementById("badgeNotas").textContent =
+      `${total} nota${total !== 1 ? "s" : ""}`;
+
+    // ── Renderiza tabela de notas ──
+    document.getElementById("corpoNotas").innerHTML =
+      resultadosGlobais.length
+        ? resultadosGlobais.map((r, i) => renderLinha(r, i)).join("")
+        : `<tr><td colspan="8"><div class="empty">Nenhuma nota processada</div></td></tr>`;
+
+    // ── Exibe área de resultados ──
+    const area = document.getElementById("areaResultados");
+    area.style.display = "flex";
+    area.scrollIntoView({ behavior: "smooth" });
+
+    document.getElementById("headerPill").textContent =
+      `${total} nota(s) — ${comErro} com problema(s)`;
+
+  } catch (e) {
+    alert("Erro: " + e.message);
+    document.getElementById("headerPill").textContent = "Erro no processamento";
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg> Processar NF-e`;
+  }
+});
+</script>
+
+<!-- ════════════════════════════════════════════════════
+     JAVASCRIPT ADICIONAL
+     ── I.  Filtro via cards de resumo
+     ── II. Botão voltar ao topo
+     ── III. Exportar divergências para CSV
+     Não altera nenhuma lógica existente acima.
+════════════════════════════════════════════════════ -->
+<script>
+"use strict";
+
+/* ══════════════════════════════════════════════════════
+   I. FILTRO — clicar nos cards de resumo filtra a tabela
+══════════════════════════════════════════════════════ */
+
+// Estado do filtro: "todos" | "erros" | "ok"
+let filtroAtivo = "todos";
+
+/**
+ * Aplica o filtro atual nas linhas da tabela de notas.
+ * Usa display none/table-row nas linhas geradas dinamicamente.
+ * Cada nota ocupa DUAS linhas: a principal (nm-idx) e o detalhe (detail-row).
+ */
+function aplicarFiltro() {
+  const tbody = document.getElementById("corpoNotas");
+  if (!tbody) return;
+
+  // Pega todos os pares de linhas (principal + detalhe)
+  const linhas = tbody.querySelectorAll("tr[id^='nm-']");
+
+  linhas.forEach(linhaPrincipal => {
+    const idx        = linhaPrincipal.id.replace("nm-", "");
+    const resultado  = resultadosGlobais[parseInt(idx)];
+    if (!resultado) return;
+
+    const temErro = resultado.erros.length > 0 || resultado.calculo.alertas.length > 0;
+    const linhaDetalhe = linhaPrincipal.nextElementSibling; // a .detail-row
+
+    let mostrar = false;
+    if (filtroAtivo === "todos")  mostrar = true;
+    if (filtroAtivo === "erros")  mostrar = temErro;
+    if (filtroAtivo === "ok")     mostrar = !temErro;
+
+    linhaPrincipal.style.display = mostrar ? "" : "none";
+    // O detalhe só fica visível se já estava aberto E a nota está sendo mostrada
+    if (linhaDetalhe) {
+      linhaDetalhe.style.display = mostrar ? "" : "none"; 
+    }
+  });
+
+  // Atualiza o badge de quantidade visível
+  const visiveis = Array.from(linhas).filter(l => l.style.display !== "none").length;
+  document.getElementById("badgeNotas").textContent =
+    `${visiveis} nota${visiveis !== 1 ? "s" : ""}`;
+
+  // Atualiza label e destaque visual dos cards
+  const label = document.getElementById("filtroLabel");
+
+  document.querySelectorAll(".summary-card").forEach(c => c.classList.remove("filtro-ativo"));
+
+  if (filtroAtivo === "todos") {
+    label.classList.remove("visivel");
+  } else {
+    label.textContent = filtroAtivo === "erros" ? "Mostrando: com divergência" : "Mostrando: sem divergência";
+    label.classList.add("visivel");
+    const sel = filtroAtivo === "erros" ? ".summary-card.errors" : ".summary-card.ok";
+    document.querySelector(sel)?.classList.add("filtro-ativo");
+  }
+}
+
+// Listeners dos cards de resumo
+document.querySelector(".summary-card.total").addEventListener("click", () => {
+  filtroAtivo = "todos";
+  aplicarFiltro();
+});
+
+document.querySelector(".summary-card.errors").addEventListener("click", () => {
+  // Alterna: se já está ativo, volta para todos
+  filtroAtivo = filtroAtivo === "erros" ? "todos" : "erros";
+  aplicarFiltro();
+});
+
+document.querySelector(".summary-card.ok").addEventListener("click", () => {
+  filtroAtivo = filtroAtivo === "ok" ? "todos" : "ok";
+  aplicarFiltro();
+});
+
+// Reseta o filtro sempre que um novo processamento é feito
+const btnProcessarRef = document.getElementById("btnProcessar");
+btnProcessarRef.addEventListener("click", () => {
+  filtroAtivo = "todos";
+  document.querySelectorAll(".summary-card").forEach(c => c.classList.remove("filtro-ativo"));
+  document.getElementById("filtroLabel")?.classList.remove("visivel");
+}, true); // capture=true: executa antes do listener principal
+
+/* ══════════════════════════════════════════════════════
+   II. BOTÃO VOLTAR AO TOPO
+══════════════════════════════════════════════════════ */
+
+const btnTopo = document.getElementById("btnTopo");
+
+// Mostra o botão após rolar 300px
+window.addEventListener("scroll", () => {
+  if (window.scrollY > 300) {
+    btnTopo.classList.add("visivel");
+  } else {
+    btnTopo.classList.remove("visivel");
+  }
+}, { passive: true });
+
+btnTopo.addEventListener("click", () => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+/* ══════════════════════════════════════════════════════
+   III. EXPORTAR DIVERGÊNCIAS PARA CSV
+   Gera um arquivo .csv com todas as notas que têm erros.
+   Usa apenas dados já processados em resultadosGlobais.
+══════════════════════════════════════════════════════ */
+
+/**
+ * Exporta para .xlsx REAL usando SheetJS.
+ *
+ * Organização:
+ *   - Uma aba por natureza da operação (ex: VENDA, DEVOLUÇÃO…)
+ *   - Se a natureza não existir no cabecalho → aba "SEM NATUREZA"
+ *   - Apenas notas com divergência
+ *
+ * Colunas:
+ *   Nº Nota | Emitente | Destinatário | Natureza | CFOP(s) |
+ *   Valor NF | ICMS | IPI | ST | DIFAL | PIS (XML) | COFINS (XML) |
+ *   Tipo Divergência | Detalhe
+ *
+ * Formatação:
+ *   - Cabeçalho em negrito
+ *   - Largura de coluna automática
+ *   - Auto filtro no cabeçalho
+ *   - Primeira linha congelada
+ *   - Alinhamento central nas colunas de código
+ */
+function exportarRelatorio() {
+  const divergentes = resultadosGlobais.filter(
+    r => r.erros.length > 0 || r.calculo.alertas.length > 0
+  );
+
+  if (divergentes.length === 0) {
+    alert("Nenhuma nota com divergência para exportar.");
+    return;
+  }
+
+  // Verifica se SheetJS foi carregado
+  if (typeof XLSX === "undefined") {
+    alert("Biblioteca SheetJS não carregada. Verifique a conexão com internet.");
+    return;
+  }
+
+  // ── Colunas da planilha ──────────────────────────────
+  const COLS = [
+    "Nº Nota", "Série", "Emitente", "Destinatário",
+    "Natureza da Operação", "CFOP(s)",
+    "Valor NF (R$)", "ICMS (R$)", "IPI (R$)", "ST (R$)", "DIFAL (R$)",
+    "PIS XML (R$)", "COFINS XML (R$)",
+    "Tipo Divergência", "Detalhe"
+  ];
+
+  // ── Agrupa notas por natureza da operação ────────────
+  const grupos = {};
+
+  divergentes.forEach(r => {
+    const { cabecalho: cab, itens, erros, calculo } = r;
+
+    // Naturaliza o nome da aba: maiúsculo, sem chars inválidos para Excel
+    const natRaw  = (cab.natureza || "").trim().toUpperCase();
+    const natAba  = natRaw.replace(/[\\/?*[\]]/g, "").substring(0, 31) || "SEM NATUREZA";
+
+    if (!grupos[natAba]) grupos[natAba] = [];
+
+    const cfops = [...new Set(itens.map(it => it.cfop))].join(" / ");
+
+    const todosProblemas = [
+      ...erros,
+      ...calculo.alertas.map(a => ({ ...a })),
+    ];
+
+    todosProblemas.forEach(prob => {
+      grupos[natAba].push([
+        cab.numero,
+        cab.serie,
+        cab.nomeEmitente     || "",
+        cab.nomeDestinatario || "",
+        cab.natureza         || "",
+        cfops,
+        cab.vNF,
+        cab.vICMS,
+        cab.vIPI,
+        cab.vST,
+        cab.vDIFAL,
+        cab.vPIS_xml,
+        cab.vCOFINS_xml,
+        prob.tipo.replace(/_/g, " "),
+        prob.msg,
+      ]);
+    });
+  });
+
+  // ── Monta o workbook ─────────────────────────────────
+  const wb = XLSX.utils.book_new();
+
+  Object.entries(grupos).forEach(([nomeAba, linhas]) => {
+
+    // Monta array de arrays: cabeçalho + dados
+    const aoa = [COLS, ...linhas];
+    const ws  = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Largura automática de coluna — mede o maior conteúdo de cada coluna
+    const colWidths = COLS.map((header, ci) => {
+      let max = header.length;
+      linhas.forEach(row => {
+        const cell = String(row[ci] ?? "");
+        if (cell.length > max) max = cell.length;
+      });
+      return { wch: Math.min(max + 2, 60) }; // teto de 60 chars
+    });
+    ws["!cols"] = colWidths;
+
+    // Congelar primeira linha
+    ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+    // Auto filtro no cabeçalho
+    const lastCol = XLSX.utils.encode_col(COLS.length - 1);
+    ws["!autofilter"] = { ref: `A1:${lastCol}1` };
+
+    // Negrito no cabeçalho (linha 1)
+    COLS.forEach((_, ci) => {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c: ci });
+      if (!ws[cellRef]) return;
+      ws[cellRef].s = {
+        font:      { bold: true, color: { rgb: "FFFFFF" } },
+        fill:      { fgColor: { rgb: "0F1420" } },
+        alignment: { horizontal: "center", vertical: "center", wrapText: false },
+      };
+    });
+
+    // Colunas numéricas: formato moeda BRL
+    const colsMonetarias = [6, 7, 8, 9, 10, 11, 12]; // índices 0-based
+    linhas.forEach((_, ri) => {
+      colsMonetarias.forEach(ci => {
+        const cellRef = XLSX.utils.encode_cell({ r: ri + 1, c: ci });
+        if (!ws[cellRef]) return;
+        ws[cellRef].z = '#,##0.00';
+        if (!ws[cellRef].s) ws[cellRef].s = {};
+        ws[cellRef].s.alignment = { horizontal: "right" };
+      });
+
+      // Colunas de código (Nº, Série, CFOP, CST): centralizar
+      [0, 1, 5].forEach(ci => {
+        const cellRef = XLSX.utils.encode_cell({ r: ri + 1, c: ci });
+        if (!ws[cellRef]) return;
+        if (!ws[cellRef].s) ws[cellRef].s = {};
+        ws[cellRef].s.alignment = { horizontal: "center" };
+      });
+    });
+
+    XLSX.utils.book_append_sheet(wb, ws, nomeAba);
+  });
+
+  // ── Download ─────────────────────────────────────────
+  const data = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  XLSX.writeFile(wb, `relatorio_divergencias_${data}.xlsx`);
+}
+
+// Exibe o botão exportar após processamento e conecta o clique
+// O botão só aparece quando há resultados — observa mutations no corpoNotas
+const observerExportar = new MutationObserver(() => {
+  const btn = document.getElementById("btnExportar");
+  if (!btn) return;
+  const temDivergentes = resultadosGlobais.some(
+    r => r.erros.length > 0 || r.calculo.alertas.length > 0
+  );
+  btn.classList.toggle("visivel", temDivergentes);
+});
+
+observerExportar.observe(document.getElementById("corpoNotas"), { childList: true });
+
+// Conecta o botão — nome corrigido (sem acento tipográfico)
+document.getElementById("btnExportar").addEventListener("click", exportarRelatorio);
+</script>
+
+<!-- Botão flutuante — Voltar ao topo -->
+<button id="btnTopo" title="Voltar ao topo">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <polyline points="18 15 12 9 6 15"/>
+  </svg>
+</button>
+
+</body>
+</html>
